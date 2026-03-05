@@ -1,19 +1,18 @@
 /**
  * Book My Stay - Hotel Booking Management System
  *
- * Use Case 5: Booking Request Queue (First-Come-First-Served)
+ * Use Case 6: Reservation Confirmation & Room Allocation
  *
- * Demonstrates how a Queue can be used to store booking
- * requests in the order they arrive.
+ * Demonstrates safe room allocation using Queue, HashMap,
+ * and Set to prevent double booking.
  *
  * @author ShristyShree
- * @version 5.1
+ * @version 6.1
  */
 
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
-// Reservation class representing a booking request
+// Reservation class representing booking request
 class Reservation {
 
     private String guestName;
@@ -31,41 +30,97 @@ class Reservation {
     public String getRoomType() {
         return roomType;
     }
+}
 
-    public void displayReservation() {
-        System.out.println("Guest: " + guestName + " | Requested Room: " + roomType);
+
+// Room Inventory Service
+class InventoryService {
+
+    private Map<String, Integer> inventory = new HashMap<>();
+
+    public InventoryService() {
+        inventory.put("Single Room", 2);
+        inventory.put("Double Room", 2);
+        inventory.put("Suite Room", 1);
+    }
+
+    public int getAvailability(String roomType) {
+        return inventory.getOrDefault(roomType, 0);
+    }
+
+    public void decrementRoom(String roomType) {
+        inventory.put(roomType, inventory.get(roomType) - 1);
+    }
+
+    public void displayInventory() {
+        System.out.println("\nCurrent Inventory:");
+        for (String room : inventory.keySet()) {
+            System.out.println(room + " -> Available: " + inventory.get(room));
+        }
     }
 }
 
 
-// Booking Request Queue
-class BookingRequestQueue {
+// Booking Service for allocation
+class BookingService {
 
     private Queue<Reservation> requestQueue;
+    private InventoryService inventoryService;
 
-    public BookingRequestQueue() {
-        requestQueue = new LinkedList<>();
+    private Set<String> allocatedRoomIds = new HashSet<>();
+    private Map<String, Set<String>> roomAllocationMap = new HashMap<>();
+
+    private int roomCounter = 1;
+
+    public BookingService(Queue<Reservation> requestQueue, InventoryService inventoryService) {
+        this.requestQueue = requestQueue;
+        this.inventoryService = inventoryService;
     }
 
-    // Add booking request
-    public void addRequest(Reservation reservation) {
-        requestQueue.offer(reservation);
-        System.out.println("Booking request added for " + reservation.getGuestName());
+    public void processBookings() {
+
+        while (!requestQueue.isEmpty()) {
+
+            Reservation request = requestQueue.poll();
+
+            String roomType = request.getRoomType();
+            String guest = request.getGuestName();
+
+            System.out.println("\nProcessing reservation for " + guest);
+
+            if (inventoryService.getAvailability(roomType) > 0) {
+
+                String roomId = generateRoomId(roomType);
+
+                allocatedRoomIds.add(roomId);
+
+                roomAllocationMap
+                        .computeIfAbsent(roomType, k -> new HashSet<>())
+                        .add(roomId);
+
+                inventoryService.decrementRoom(roomType);
+
+                System.out.println("Reservation Confirmed!");
+                System.out.println("Guest: " + guest);
+                System.out.println("Room Type: " + roomType);
+                System.out.println("Assigned Room ID: " + roomId);
+
+            } else {
+
+                System.out.println("Reservation Failed: No available rooms for " + roomType);
+            }
+        }
     }
 
-    // Display queued requests
-    public void displayQueue() {
+    private String generateRoomId(String roomType) {
 
-        System.out.println("\nCurrent Booking Request Queue:");
+        String roomId;
 
-        if (requestQueue.isEmpty()) {
-            System.out.println("No booking requests.");
-            return;
-        }
+        do {
+            roomId = roomType.substring(0,2).toUpperCase() + "-" + roomCounter++;
+        } while (allocatedRoomIds.contains(roomId));
 
-        for (Reservation r : requestQueue) {
-            r.displayReservation();
-        }
+        return roomId;
     }
 }
 
@@ -77,24 +132,25 @@ public class BookMyStayApp {
         System.out.println("=================================");
         System.out.println("     Book My Stay Application    ");
         System.out.println(" Hotel Booking Management System ");
-        System.out.println(" Version: 5.1");
-        System.out.println("=================================\n");
+        System.out.println(" Version: 6.1");
+        System.out.println("=================================");
 
-        // Initialize booking queue
-        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        // Initialize inventory
+        InventoryService inventory = new InventoryService();
 
-        // Guests submit booking requests
-        Reservation r1 = new Reservation("Alice", "Single Room");
-        Reservation r2 = new Reservation("Bob", "Double Room");
-        Reservation r3 = new Reservation("Charlie", "Suite Room");
+        // Booking request queue
+        Queue<Reservation> requestQueue = new LinkedList<>();
 
-        bookingQueue.addRequest(r1);
-        bookingQueue.addRequest(r2);
-        bookingQueue.addRequest(r3);
+        requestQueue.offer(new Reservation("Alice", "Single Room"));
+        requestQueue.offer(new Reservation("Bob", "Double Room"));
+        requestQueue.offer(new Reservation("Charlie", "Suite Room"));
+        requestQueue.offer(new Reservation("David", "Single Room"));
 
-        // Display queue (FIFO order preserved)
-        bookingQueue.displayQueue();
+        // Process booking requests
+        BookingService bookingService = new BookingService(requestQueue, inventory);
 
-        System.out.println("\nRequests stored successfully and waiting for processing.");
+        bookingService.processBookings();
+
+        inventory.displayInventory();
     }
 }
